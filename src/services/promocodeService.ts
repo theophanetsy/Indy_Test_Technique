@@ -27,67 +27,43 @@ export function getPromocode(name: string): Promocode | undefined {
 // ─── Weather service ──────────────────────────────────────────────────────────
 
 interface WeatherData {
-  description: string // e.g. "clear sky"
+  description: string // e.g. "clear", "rain", "snow"
   temp: number        // Celsius
 }
 
 /**
- * Fetch current weather for a given town using the open-meteo geocoding +
- * weather API (no API key required).
+ * Fetch current weather for a given town using the OpenWeather API.
+ * Requires the OPENWEATHER_API_KEY environment variable.
  *
- * Strategy:
- * 1. Geocode the town name → lat/lon
- * 2. Fetch current weather → weather code + temperature
+ * Returns a description derived from weather[0].main (lowercased) and the
+ * temperature in Celsius.
+ *
+ * Reference: https://openweathermap.org/current
  */
 export async function fetchWeather(town: string): Promise<WeatherData> {
-  // Step 1 – Geocode
-  const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(town)}&count=1&language=en&format=json`
-  const geoRes = await fetch(geoUrl)
-  if (!geoRes.ok) {
-    throw new Error(`Geocoding failed for town "${town}": ${geoRes.statusText}`)
-  }
-  const geoData = await geoRes.json() as { results?: Array<{ latitude: number; longitude: number }> }
-  if (!geoData.results || geoData.results.length === 0) {
-    throw new Error(`Town "${town}" not found`)
-  }
-  const { latitude, longitude } = geoData.results[0]
-
-  // Step 2 – Weather (WMO weather code + temperature)
-  const weatherUrl =
-    `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}` +
-    `&current=temperature_2m,weather_code&temperature_unit=celsius&timezone=auto`
-  const weatherRes = await fetch(weatherUrl)
-  if (!weatherRes.ok) {
-    throw new Error(`Weather API failed: ${weatherRes.statusText}`)
-  }
-  const weatherData = await weatherRes.json() as {
-    current: { temperature_2m: number; weather_code: number }
+  const apiKey = process.env.OPENWEATHER_API_KEY
+  if (!apiKey) {
+    throw new Error('OPENWEATHER_API_KEY environment variable is not set')
   }
 
-  const { temperature_2m, weather_code } = weatherData.current
+  const url =
+    `https://api.openweathermap.org/data/2.5/weather` +
+    `?q=${encodeURIComponent(town)}&appid=${apiKey}&units=metric`
+
+  const res = await fetch(url)
+  if (!res.ok) {
+    throw new Error(`Weather API failed for town "${town}": ${res.statusText}`)
+  }
+
+  const data = await res.json() as {
+    weather: Array<{ main: string }>
+    main: { temp: number }
+  }
 
   return {
-    description: wmoCodeToDescription(weather_code),
-    temp: temperature_2m,
+    description: data.weather[0].main.toLowerCase(),
+    temp: data.main.temp,
   }
-}
-
-/**
- * Map a WMO weather code to a simplified description.
- * Reference: https://open-meteo.com/en/docs#weathervariables
- */
-function wmoCodeToDescription(code: number): string {
-  if (code === 0) return 'clear'
-  if (code <= 2) return 'partly cloudy'
-  if (code === 3) return 'overcast'
-  if (code <= 49) return 'foggy'
-  if (code <= 57) return 'drizzle'
-  if (code <= 67) return 'rain'
-  if (code <= 77) return 'snow'
-  if (code <= 82) return 'showers'
-  if (code <= 86) return 'snow showers'
-  if (code <= 99) return 'thunderstorm'
-  return 'unknown'
 }
 
 // ─── Restriction evaluation ───────────────────────────────────────────────────
