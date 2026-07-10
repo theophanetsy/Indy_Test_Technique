@@ -1,6 +1,11 @@
 import { test } from 'node:test'
 import * as assert from 'node:assert'
-import { fetchWeather } from '../../src/services/promocodeService'
+import {
+  fetchWeather,
+  evaluateAgeRestriction,
+  evaluateDateRestriction,
+  evaluateWeatherRestriction,
+} from '../../src/services/promocodeService'
 
 // Ensure the API key env var is set for all tests (fetch is mocked, key value doesn't matter)
 process.env.OPENWEATHER_API_KEY = process.env.OPENWEATHER_API_KEY || 'test-key'
@@ -109,3 +114,208 @@ test('fetchWeather — throws when OPENWEATHER_API_KEY is not set', async (t) =>
   )
 })
 
+// ─── evaluateAgeRestriction ───────────────────────────────────────────────────
+
+test('evaluateAgeRestriction — passes when age equals eq', () => {
+  const reasons = evaluateAgeRestriction({ age: { eq: 40 } }, { age: 40 })
+  assert.deepStrictEqual(reasons, [])
+})
+
+test('evaluateAgeRestriction — fails when age differs from eq', () => {
+  const reasons = evaluateAgeRestriction({ age: { eq: 40 } }, { age: 41 })
+  assert.strictEqual(reasons.length, 1)
+  assert.ok(reasons[0].includes('exactly 40'))
+})
+
+test('evaluateAgeRestriction — passes when age is strictly greater than gt', () => {
+  const reasons = evaluateAgeRestriction({ age: { gt: 18 } }, { age: 19 })
+  assert.deepStrictEqual(reasons, [])
+})
+
+test('evaluateAgeRestriction — fails when age equals gt (boundary: must be strictly greater)', () => {
+  const reasons = evaluateAgeRestriction({ age: { gt: 18 } }, { age: 18 })
+  assert.strictEqual(reasons.length, 1)
+  assert.ok(reasons[0].includes('greater than 18'))
+})
+
+test('evaluateAgeRestriction — fails when age is below gt', () => {
+  const reasons = evaluateAgeRestriction({ age: { gt: 18 } }, { age: 10 })
+  assert.strictEqual(reasons.length, 1)
+})
+
+test('evaluateAgeRestriction — passes when age is strictly less than lt', () => {
+  const reasons = evaluateAgeRestriction({ age: { lt: 30 } }, { age: 29 })
+  assert.deepStrictEqual(reasons, [])
+})
+
+test('evaluateAgeRestriction — fails when age equals lt (boundary: must be strictly less)', () => {
+  const reasons = evaluateAgeRestriction({ age: { lt: 30 } }, { age: 30 })
+  assert.strictEqual(reasons.length, 1)
+  assert.ok(reasons[0].includes('less than 30'))
+})
+
+test('evaluateAgeRestriction — fails when age is above lt', () => {
+  const reasons = evaluateAgeRestriction({ age: { lt: 30 } }, { age: 35 })
+  assert.strictEqual(reasons.length, 1)
+})
+
+test('evaluateAgeRestriction — passes with combined gt+lt when age is in range', () => {
+  // spec example: age > 15 AND age < 30
+  const reasons = evaluateAgeRestriction({ age: { gt: 15, lt: 30 } }, { age: 20 })
+  assert.deepStrictEqual(reasons, [])
+})
+
+test('evaluateAgeRestriction — fails both gt and lt when age is out of range on both ends', () => {
+  // Age 15 is not > 15 (gt fails) and not a lt issue
+  const reasons = evaluateAgeRestriction({ age: { gt: 15, lt: 30 } }, { age: 15 })
+  assert.strictEqual(reasons.length, 1)
+  assert.ok(reasons[0].includes('greater than 15'))
+})
+
+test('evaluateAgeRestriction — returns empty reasons when age object has no constraints', () => {
+  const reasons = evaluateAgeRestriction({ age: {} }, { age: 99 })
+  assert.deepStrictEqual(reasons, [])
+})
+
+// ─── evaluateDateRestriction ──────────────────────────────────────────────────
+
+test('evaluateDateRestriction — passes when today is within after/before range', () => {
+  const past   = new Date(Date.now() - 10 * 86400000).toISOString().split('T')[0]
+  const future = new Date(Date.now() + 10 * 86400000).toISOString().split('T')[0]
+  const reasons = evaluateDateRestriction({ date: { after: past, before: future } }, { age: 0 })
+  assert.deepStrictEqual(reasons, [])
+})
+
+test('evaluateDateRestriction — fails when today is before "after" date', () => {
+  const reasons = evaluateDateRestriction({ date: { after: '2099-01-01' } }, { age: 0 })
+  assert.strictEqual(reasons.length, 1)
+  assert.ok(reasons[0].includes('not yet valid'))
+})
+
+test('evaluateDateRestriction — fails when today is after "before" date', () => {
+  const reasons = evaluateDateRestriction({ date: { before: '2019-12-31' } }, { age: 0 })
+  assert.strictEqual(reasons.length, 1)
+  assert.ok(reasons[0].includes('expired'))
+})
+
+test('evaluateDateRestriction — passes with only "after" when today is past that date', () => {
+  const reasons = evaluateDateRestriction({ date: { after: '2000-01-01' } }, { age: 0 })
+  assert.deepStrictEqual(reasons, [])
+})
+
+test('evaluateDateRestriction — passes with only "before" when today is before that date', () => {
+  const reasons = evaluateDateRestriction({ date: { before: '2099-12-31' } }, { age: 0 })
+  assert.deepStrictEqual(reasons, [])
+})
+
+test('evaluateDateRestriction — collects two reasons when both after and before fail', () => {
+  // after in the future AND before in the past → both constraints violated
+  const reasons = evaluateDateRestriction(
+    { date: { after: '2099-01-01', before: '2019-12-31' } },
+    { age: 0 }
+  )
+  assert.strictEqual(reasons.length, 2)
+})
+
+test('evaluateDateRestriction — passes when date object has no constraints', () => {
+  const reasons = evaluateDateRestriction({ date: {} }, { age: 0 })
+  assert.deepStrictEqual(reasons, [])
+})
+
+// ─── evaluateWeatherRestriction ───────────────────────────────────────────────
+
+test('evaluateWeatherRestriction — returns "Weather data unavailable" when ctx.weather is absent', () => {
+  const reasons = evaluateWeatherRestriction({ weather: { is: 'clear' } }, { age: 0 })
+  assert.deepStrictEqual(reasons, ['Weather data unavailable'])
+})
+
+test('evaluateWeatherRestriction — passes when description matches "is"', () => {
+  const reasons = evaluateWeatherRestriction(
+    { weather: { is: 'clear' } },
+    { age: 0, weather: { description: 'clear', temp: 20 } }
+  )
+  assert.deepStrictEqual(reasons, [])
+})
+
+test('evaluateWeatherRestriction — fails when description does not match "is"', () => {
+  const reasons = evaluateWeatherRestriction(
+    { weather: { is: 'clear' } },
+    { age: 0, weather: { description: 'rain', temp: 20 } }
+  )
+  assert.strictEqual(reasons.length, 1)
+  assert.ok(reasons[0].includes('"clear"') && reasons[0].includes('"rain"'))
+})
+
+test('evaluateWeatherRestriction — passes when temp is strictly above temp.gt', () => {
+  const reasons = evaluateWeatherRestriction(
+    { weather: { temp: { gt: 15 } } },
+    { age: 0, weather: { description: 'clear', temp: 20 } }
+  )
+  assert.deepStrictEqual(reasons, [])
+})
+
+test('evaluateWeatherRestriction — fails when temp equals temp.gt (boundary: must be strictly greater)', () => {
+  const reasons = evaluateWeatherRestriction(
+    { weather: { temp: { gt: 15 } } },
+    { age: 0, weather: { description: 'clear', temp: 15 } }
+  )
+  assert.strictEqual(reasons.length, 1)
+  assert.ok(reasons[0].includes('> 15'))
+})
+
+test('evaluateWeatherRestriction — fails when temp is below temp.gt', () => {
+  const reasons = evaluateWeatherRestriction(
+    { weather: { temp: { gt: 15 } } },
+    { age: 0, weather: { description: 'clear', temp: 10 } }
+  )
+  assert.strictEqual(reasons.length, 1)
+})
+
+test('evaluateWeatherRestriction — passes when temp is strictly below temp.lt', () => {
+  const reasons = evaluateWeatherRestriction(
+    { weather: { temp: { lt: 30 } } },
+    { age: 0, weather: { description: 'clear', temp: 25 } }
+  )
+  assert.deepStrictEqual(reasons, [])
+})
+
+test('evaluateWeatherRestriction — fails when temp equals temp.lt (boundary: must be strictly less)', () => {
+  const reasons = evaluateWeatherRestriction(
+    { weather: { temp: { lt: 30 } } },
+    { age: 0, weather: { description: 'clear', temp: 30 } }
+  )
+  assert.strictEqual(reasons.length, 1)
+  assert.ok(reasons[0].includes('< 30'))
+})
+
+test('evaluateWeatherRestriction — fails when temp is above temp.lt', () => {
+  const reasons = evaluateWeatherRestriction(
+    { weather: { temp: { lt: 30 } } },
+    { age: 0, weather: { description: 'clear', temp: 35 } }
+  )
+  assert.strictEqual(reasons.length, 1)
+})
+
+test('evaluateWeatherRestriction — passes with both "is" and "temp" matching', () => {
+  const reasons = evaluateWeatherRestriction(
+    { weather: { is: 'clear', temp: { gt: 15, lt: 35 } } },
+    { age: 0, weather: { description: 'clear', temp: 25 } }
+  )
+  assert.deepStrictEqual(reasons, [])
+})
+
+test('evaluateWeatherRestriction — collects two reasons when both "is" and "temp.gt" fail', () => {
+  const reasons = evaluateWeatherRestriction(
+    { weather: { is: 'clear', temp: { gt: 15 } } },
+    { age: 0, weather: { description: 'rain', temp: 10 } }
+  )
+  assert.strictEqual(reasons.length, 2)
+})
+
+test('evaluateWeatherRestriction — passes when restriction has no "is" or "temp"', () => {
+  const reasons = evaluateWeatherRestriction(
+    { weather: {} },
+    { age: 0, weather: { description: 'fog', temp: 5 } }
+  )
+  assert.deepStrictEqual(reasons, [])
+})

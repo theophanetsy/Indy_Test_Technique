@@ -73,17 +73,12 @@ interface EvaluationContext {
   weather?: WeatherData
 }
 
-/**
- * Evaluate a single restriction node.
- * Returns an array of failure reasons (empty = success).
- */
-function evaluateRestriction(
-  restriction: Restriction,
+
+export function evaluateAgeRestriction(
+  restriction: LeafAgeRestriction,
   ctx: EvaluationContext
 ): string[] {
-  // --- age ---
-  if ('age' in restriction) {
-    const r = (restriction as LeafAgeRestriction).age
+  const r = (restriction as LeafAgeRestriction).age
     const reasons: string[] = []
     if (r.eq !== undefined && ctx.age !== r.eq) {
       reasons.push(`Age must be exactly ${r.eq} (got ${ctx.age})`)
@@ -97,39 +92,66 @@ function evaluateRestriction(
     return reasons
   }
 
+export function evaluateDateRestriction(
+  restriction: LeafDateRestriction,
+  _ctx: EvaluationContext
+): string[] {
+  const r = restriction.date
+  const now = new Date()
+  const reasons: string[] = []
+  if (r.after !== undefined && now < new Date(r.after)) {
+    reasons.push(`Promocode is not yet valid (valid from ${r.after})`)
+  }
+  if (r.before !== undefined && now > new Date(r.before)) {
+    reasons.push(`Promocode has expired (was valid until ${r.before})`)
+  }
+  return reasons
+}
+
+export function evaluateWeatherRestriction(
+  restriction: LeafWeatherRestriction,
+  ctx: EvaluationContext
+): string[] {
+  if (!ctx.weather) {
+    return ['Weather data unavailable']
+  }
+  const r = restriction.weather
+  const reasons: string[] = []
+  if (r.is !== undefined && ctx.weather.description !== r.is) {
+    reasons.push(`Weather must be "${r.is}" (got "${ctx.weather.description}")`)
+  }
+  if (r.temp !== undefined) {
+    if (r.temp.gt !== undefined && ctx.weather.temp <= r.temp.gt) {
+      reasons.push(`Temperature must be > ${r.temp.gt}°C (got ${ctx.weather.temp}°C)`)
+    }
+    if (r.temp.lt !== undefined && ctx.weather.temp >= r.temp.lt) {
+      reasons.push(`Temperature must be < ${r.temp.lt}°C (got ${ctx.weather.temp}°C)`)
+    }
+  }
+  return reasons
+}
+
+/**
+ * Evaluate a single restriction node.
+ * Returns an array of failure reasons (empty = success).
+ */
+function evaluateRestriction(
+  restriction: Restriction,
+  ctx: EvaluationContext
+): string[] {
+  // --- age ---
+  if ('age' in restriction) {
+    return evaluateAgeRestriction(restriction as LeafAgeRestriction, ctx)
+  }
+
   // --- date ---
   if ('date' in restriction) {
-    const r = (restriction as LeafDateRestriction).date
-    const now = new Date()
-    const reasons: string[] = []
-    if (r.after !== undefined && now < new Date(r.after)) {
-      reasons.push(`Promocode is not yet valid (valid from ${r.after})`)
-    }
-    if (r.before !== undefined && now > new Date(r.before)) {
-      reasons.push(`Promocode has expired (was valid until ${r.before})`)
-    }
-    return reasons
+    return evaluateDateRestriction(restriction as LeafDateRestriction, ctx)
   }
 
   // --- weather ---
   if ('weather' in restriction) {
-    const r = (restriction as LeafWeatherRestriction).weather
-    const reasons: string[] = []
-    if (!ctx.weather) {
-      return ['Weather data unavailable']
-    }
-    if (r.is !== undefined && ctx.weather.description !== r.is) {
-      reasons.push(`Weather must be "${r.is}" (got "${ctx.weather.description}")`)
-    }
-    if (r.temp !== undefined) {
-      if (r.temp.gt !== undefined && ctx.weather.temp <= r.temp.gt) {
-        reasons.push(`Temperature must be > ${r.temp.gt}°C (got ${ctx.weather.temp}°C)`)
-      }
-      if (r.temp.lt !== undefined && ctx.weather.temp >= r.temp.lt) {
-        reasons.push(`Temperature must be < ${r.temp.lt}°C (got ${ctx.weather.temp}°C)`)
-      }
-    }
-    return reasons
+    return evaluateWeatherRestriction(restriction as LeafWeatherRestriction, ctx)
   }
 
   // --- or ---
@@ -151,7 +173,7 @@ function evaluateRestriction(
   if ('and' in restriction) {
     const { and } = restriction as AndRestriction
     // All branches must pass
-    return and.flatMap((r) => evaluateRestriction(r, ctx))
+    return and.flatMap((r) => evaluateRestriction(r, ctx));
   }
 
   return [`Unknown restriction type: ${JSON.stringify(restriction)}`]
