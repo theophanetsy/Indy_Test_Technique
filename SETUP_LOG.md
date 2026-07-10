@@ -113,3 +113,13 @@ Exit code 0 ✅
 2. `npm test` doit passer (exit 0) — 4/4 tests verts, coverage 100%.
 3. Toute nouvelle feature doit être accompagnée de TUs couvrant le code ajouté.
 4. Toujours synchroniser les tests avec les modifications de routes/plugins.
+
+
+
+## prompt utilisateur 
+
+ L'exercice auquel je veux repondre avec ce repo est dans "C:\dev\Indy\Test technique Indy.htm"
+  J'ai initié le projet, j'aimerais que tu me créé les fichiers pour avoir les 2 routes.
+  1 ere route api/promocode POST avec un nom, un avantage, et des restrictions.
+  2 eme route api/promocode/apply
+  
