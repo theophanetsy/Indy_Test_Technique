@@ -1,0 +1,195 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "Promocode API",
+    "description": "Collection pour tester l'API de gestion de promocodes.\n\nBase URL: http://localhost:3000\n\nRoutes:\n- POST /api/promocode       → Créer un promocode\n- POST /api/promocode/apply → Valider un promocode",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "POST /api/promocode — Création",
+      "item": [
+        {
+          "name": "201 — Promocode simple (restriction d'âge)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/promocode", "host": ["{{baseUrl}}"], "path": ["api", "promocode"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"SUMMER_AGE\",\n  \"advantage\": { \"percent\": 15 },\n  \"restrictions\": [\n    { \"age\": { \"gt\": 18 } }\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "201 — Promocode avec restriction de date",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/promocode", "host": ["{{baseUrl}}"], "path": ["api", "promocode"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"SUMMER2025\",\n  \"advantage\": { \"percent\": 10 },\n  \"restrictions\": [\n    { \"date\": { \"after\": \"2025-06-01\", \"before\": \"2025-08-31\" } }\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "201 — Promocode avec restriction météo",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/promocode", "host": ["{{baseUrl}}"], "path": ["api", "promocode"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"SUNNY_RIDE\",\n  \"advantage\": { \"percent\": 25 },\n  \"restrictions\": [\n    { \"weather\": { \"is\": \"clear\", \"temp\": { \"gt\": 20 } } }\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "201 — Promocode complexe (exemple spec)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/promocode", "host": ["{{baseUrl}}"], "path": ["api", "promocode"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"WeatherCode\",\n  \"advantage\": { \"percent\": 20 },\n  \"restrictions\": [\n    { \"date\": { \"after\": \"2024-01-01\", \"before\": \"2027-12-31\" } },\n    {\n      \"or\": [\n        { \"age\": { \"eq\": 40 } },\n        {\n          \"and\": [\n            { \"age\": { \"lt\": 30, \"gt\": 15 } },\n            { \"weather\": { \"is\": \"clear\", \"temp\": { \"gt\": 15 } } }\n          ]\n        }\n      ]\n    }\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "409 — Nom déjà existant (doublon)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/promocode", "host": ["{{baseUrl}}"], "path": ["api", "promocode"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"SUMMER_AGE\",\n  \"advantage\": { \"percent\": 15 },\n  \"restrictions\": [\n    { \"age\": { \"gt\": 18 } }\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "400 — Champ name manquant",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/promocode", "host": ["{{baseUrl}}"], "path": ["api", "promocode"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"advantage\": { \"percent\": 10 },\n  \"restrictions\": []\n}"
+            }
+          }
+        },
+        {
+          "name": "400 — Percent invalide (> 100)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/promocode", "host": ["{{baseUrl}}"], "path": ["api", "promocode"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"INVALID\",\n  \"advantage\": { \"percent\": 150 },\n  \"restrictions\": []\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "POST /api/promocode/apply — Validation",
+      "item": [
+        {
+          "name": "200 accepted — Âge valide (25 > 18)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/promocode/apply", "host": ["{{baseUrl}}"], "path": ["api", "promocode", "apply"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"promocode_name\": \"SUMMER_AGE\",\n  \"arguments\": {\n    \"age\": 25,\n    \"town\": \"Paris\"\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "200 denied — Âge invalide (15 n'est pas > 18)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/promocode/apply", "host": ["{{baseUrl}}"], "path": ["api", "promocode", "apply"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"promocode_name\": \"SUMMER_AGE\",\n  \"arguments\": {\n    \"age\": 15,\n    \"town\": \"Paris\"\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "200 denied — Date expirée",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/promocode/apply", "host": ["{{baseUrl}}"], "path": ["api", "promocode", "apply"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"promocode_name\": \"SUMMER2025\",\n  \"arguments\": {\n    \"age\": 30,\n    \"town\": \"Lyon\"\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "200 accepted/denied — Exemple spec avec météo réelle (Lyon)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/promocode/apply", "host": ["{{baseUrl}}"], "path": ["api", "promocode", "apply"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"promocode_name\": \"WeatherCode\",\n  \"arguments\": {\n    \"age\": 25,\n    \"town\": \"Lyon\"\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "200 accepted — Météo ensoleillée (SUNNY_RIDE)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/promocode/apply", "host": ["{{baseUrl}}"], "path": ["api", "promocode", "apply"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"promocode_name\": \"SUNNY_RIDE\",\n  \"arguments\": {\n    \"age\": 30,\n    \"town\": \"Marseille\"\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "404 — Promocode inexistant",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/promocode/apply", "host": ["{{baseUrl}}"], "path": ["api", "promocode", "apply"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"promocode_name\": \"DOES_NOT_EXIST\",\n  \"arguments\": {\n    \"age\": 25,\n    \"town\": \"Paris\"\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "400 — Champ arguments manquant",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/promocode/apply", "host": ["{{baseUrl}}"], "path": ["api", "promocode", "apply"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"promocode_name\": \"SUMMER_AGE\"\n}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
