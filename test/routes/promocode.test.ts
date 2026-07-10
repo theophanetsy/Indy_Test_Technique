@@ -301,7 +301,9 @@ test('POST /api/promocode/apply — denied: or fails when all branches fail', as
   assert.strictEqual(res.statusCode, 200)
   const body = JSON.parse(res.payload)
   assert.strictEqual(body.status, 'denied')
-  assert.ok(Array.isArray(body.reasons) && body.reasons.length > 0)
+  // Each failed branch gets its own labeled reason so the caller can tell it's an "or" failure
+  assert.ok(body.reasons.every((r: string) => r.startsWith('or branch')))
+  assert.strictEqual(body.reasons.length, 2) // one reason per branch
 })
 
 // ─── POST /api/promocode/apply — and restrictions ─────────────────────────────

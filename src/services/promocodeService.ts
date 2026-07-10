@@ -140,8 +140,11 @@ function evaluateRestriction(
     if (branchResults.some((reasons) => reasons.length === 0)) {
       return [] // at least one branch valid
     }
-    // All branches failed — collect all reasons
-    return branchResults.flat()
+    // All branches failed — return one labeled reason per branch so the caller
+    // can distinguish "or" failures from flat "and" failures
+    return branchResults.map((reasons, i) =>
+      `or branch ${i + 1} failed: ${reasons.join('; ')}`
+    )
   }
 
   // --- and ---
