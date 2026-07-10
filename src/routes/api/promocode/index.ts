@@ -1,23 +1,13 @@
 import { type FastifyPluginAsync } from 'fastify'
-import { CreatePromocodeBody, ApplyPromocodeBody } from '../../../types/promocode'
-import { addPromocode, getPromocode, validatePromocode } from '../../../services/promocodeService'
+import { CreatePromocodeBody } from '../../../types/promocode'
+import { addPromocode } from '../../../services/promocodeService'
 
-/**
- * Route plugin mounted at /api/promocode (via @fastify/autoload directory structure)
- *
- * POST /api/promocode       — Create a promocode
- * POST /api/promocode/apply — Validate a promocode for a given user
- */
+// POST /api/promocode — Create a promocode
 const promocodeRoutes: FastifyPluginAsync = async (fastify): Promise<void> => {
-  // ─── POST /api/promocode ──────────────────────────────────────────────────
-
   fastify.post<{ Body: CreatePromocodeBody }>(
     '/',
     {
       schema: {
-        summary: 'Create a promocode',
-        description: 'Adds a new promocode with an advantage and a set of restrictions.',
-        tags: ['Promocode'],
         body: {
           type: 'object',
           required: ['name', 'advantage', 'restrictions'],
@@ -65,93 +55,6 @@ const promocodeRoutes: FastifyPluginAsync = async (fastify): Promise<void> => {
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error'
         return reply.code(409).send({ message })
-      }
-    }
-  )
-
-  // ─── POST /api/promocode/apply ────────────────────────────────────────────
-
-  fastify.post<{ Body: ApplyPromocodeBody }>(
-    '/apply',
-    {
-      schema: {
-        summary: 'Apply a promocode',
-        description: 'Validates a promocode against user arguments. Returns the discount if valid, or the list of reasons it is invalid.',
-        tags: ['Promocode'],
-        body: {
-          type: 'object',
-          required: ['promocode_name', 'arguments'],
-          properties: {
-            promocode_name: { type: 'string' },
-            arguments: {
-              type: 'object',
-              required: ['age', 'town'],
-              properties: {
-                age: { type: 'integer', minimum: 0 },
-                town: { type: 'string' },
-              },
-            },
-          },
-        },
-        response: {
-          200: {
-            description: 'Promocode validation result',
-            type: 'object',
-            properties: {
-              promocode_name: { type: 'string' },
-              status: { type: 'string', enum: ['accepted', 'denied'] },
-              advantage: {
-                type: 'object',
-                properties: { percent: { type: 'number' } },
-              },
-              reasons: {
-                type: 'array',
-                items: { type: 'string' },
-              },
-            },
-          },
-          404: {
-            description: 'Promocode not found',
-            type: 'object',
-            properties: { message: { type: 'string' } },
-          },
-          500: {
-            description: 'Internal error (e.g. weather service unreachable)',
-            type: 'object',
-            properties: { message: { type: 'string' } },
-          },
-        },
-      },
-    },
-    async (request, reply) => {
-      const { promocode_name, arguments: args } = request.body
-
-      const promocode = getPromocode(promocode_name)
-      if (!promocode) {
-        return reply.code(404).send({
-          message: `Promocode "${promocode_name}" not found`,
-        })
-      }
-
-      try {
-        const result = await validatePromocode(promocode, args)
-
-        if (result.valid) {
-          return reply.code(200).send({
-            promocode_name,
-            status: 'accepted',
-            advantage: promocode.advantage,
-          })
-        } else {
-          return reply.code(200).send({
-            promocode_name,
-            status: 'denied',
-            reasons: result.reasons,
-          })
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Internal error'
-        return reply.code(500).send({ message })
       }
     }
   )
