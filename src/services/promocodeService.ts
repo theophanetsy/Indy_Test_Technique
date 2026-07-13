@@ -79,18 +79,18 @@ export function evaluateAgeRestriction(
   ctx: EvaluationContext
 ): string[] {
   const r = (restriction as LeafAgeRestriction).age
-    const reasons: string[] = []
-    if (r.eq !== undefined && ctx.age !== r.eq) {
-      reasons.push(`Age must be exactly ${r.eq} (got ${ctx.age})`)
-    }
-    if (r.lt !== undefined && ctx.age >= r.lt) {
-      reasons.push(`Age must be less than ${r.lt} (got ${ctx.age})`)
-    }
-    if (r.gt !== undefined && ctx.age <= r.gt) {
-      reasons.push(`Age must be greater than ${r.gt} (got ${ctx.age})`)
-    }
-    return reasons
+  const reasons: string[] = []
+  if (r.eq !== undefined && ctx.age !== r.eq) {
+    reasons.push(`Age must be exactly ${r.eq} (got ${ctx.age})`)
   }
+  if (r.lt !== undefined && ctx.age >= r.lt) {
+    reasons.push(`Age must be less than ${r.lt} (got ${ctx.age})`)
+  }
+  if (r.gt !== undefined && ctx.age <= r.gt) {
+    reasons.push(`Age must be greater than ${r.gt} (got ${ctx.age})`)
+  }
+  return reasons
+}
 
 export function evaluateDateRestriction(
   restriction: LeafDateRestriction,

@@ -1,6 +1,11 @@
 import { test } from 'node:test'
 import * as assert from 'node:assert'
 import { build } from '../helper'
+import * as promocodeService from '../../src/services/promocodeService'
+
+// Ensure the API key env var is set for all tests (fetch is mocked, key value doesn't matter)
+process.env.OPENWEATHER_API_KEY = process.env.OPENWEATHER_API_KEY || 'test-key'
+
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -81,6 +86,23 @@ test('POST /api/promocode — 400: percent below minimum (< 0)', async (t) => {
   const app = await build(t)
   const res = await createPromocode(app, { name: uid(), advantage: { percent: -1 }, restrictions: [] })
   assert.strictEqual(res.statusCode, 400)
+})
+
+test('POST /api/promocode — 500: internal server error', async (t) => {
+  const app = await build(t)
+
+  t.mock.method(promocodeService, 'addPromocode', () => {
+    throw new Error('Database connection failed')
+  })
+
+  const res = await createPromocode(app, {
+    name: 'AnyName',
+    advantage: { percent: 10 },
+    restrictions: [],
+  })
+  assert.strictEqual(res.statusCode, 500)
+  const body = JSON.parse(res.payload)
+  assert.strictEqual(body.message, 'Database connection failed')
 })
 
 // ─── POST /api/promocode/apply — validation errors ────────────────────────────

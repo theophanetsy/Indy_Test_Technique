@@ -44,6 +44,11 @@ const promocodeRoutes: FastifyPluginAsync = async (fastify): Promise<void> => {
             type: 'object',
             properties: { message: { type: 'string' } },
           },
+          500: {
+            description: 'Internal server error',
+            type: 'object',
+            properties: { message: { type: 'string' } },
+          },
         },
       },
     },
@@ -54,7 +59,10 @@ const promocodeRoutes: FastifyPluginAsync = async (fastify): Promise<void> => {
         return reply.code(201).send(created)
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error'
-        return reply.code(409).send({ message })
+        if (message.includes('already exists')) {
+          return reply.code(409).send({ message })
+        }
+        return reply.code(500).send({ message })
       }
     }
   )
