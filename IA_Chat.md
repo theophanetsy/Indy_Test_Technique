@@ -309,3 +309,59 @@ postman/
 | Lines | 99.34% |
 
 > Les seules branches non couvertes (lignes 56/83 des routes, 178-180 du service) sont les branches `err instanceof Error === false` dans les blocs `catch` — théoriquement inatteignables en TypeScript car `addPromocode` et `fetchWeather` ne lèvent que des `Error`.
+
+---
+
+# Session du 13/07/2026 — Documentation des choix techniques
+
+**Date :** 13/07/2026  
+**Auteur :** @theophane-tassy + Antigravity (IA agentique)
+
+---
+
+## Synthèse des choix techniques dans le README
+
+### Prompt utilisateur
+> Tu peux agrémenter le README.md avec mes choix techniques:
+>
+> Choix de Fastify pour tester le framework, possible grace au developpement agentic pour cet exercice.
+>
+> Choix de differencier le message d'erreur sur la restrictions "or" car cela pouvait porter a confusion.
+>
+> Une architecture et folder pour chaque route, plus de clarté et de compartimentation du code.
+> Rajoute notre conversation dans IA_chat.md a la suite stp.
+
+### Ce qui a été fait
+
+L'agent a complété le [README.md](file:///c:/dev/Indy/Indy_Test_Technique/README.md) en ajoutant une section **Choix Techniques** qui résume et formalise les décisions prises :
+
+1. **Choix de Fastify** : Framework retenu pour expérimenter ses performances et sa structure moderne, dont la mise en œuvre a été accélérée et facilitée par le développement agentique pour cet exercice.
+2. **Architecture modulaire (un dossier par route)** : Chaque route a été isolée dans un sous-dossier dédié contenant son propre `index.ts` (`src/routes/api/promocode/index.ts` et `src/routes/api/promocode/apply/index.ts`), évitant ainsi le masquage silencieux des routes par `@fastify/autoload` et augmentant la clarté.
+3. **Différenciation des messages d'erreur pour les restrictions "or"** : Ajustement des messages d'erreur pour les restrictions logiques "or" (chaque branche renvoie son propre libellé d'erreur préfixé par `or branch X failed: ...`) afin d'éviter toute confusion et d'expliciter le diagnostic pour les clients de l'API.
+
+De plus, cette conversation a été archivée dans ce fichier [IA_Chat.md](file:///c:/dev/Indy/Indy_Test_Technique/IA_Chat.md) pour assurer la traçabilité des échanges.
+
+---
+
+## Gestion de l'erreur 500 sur la route de création de promocode et refactoring du test de simulation d'erreur
+
+### Prompt utilisateur
+> est ce que le code http 400 pour un duplicat est le meilleur status code ?
+> 
+> Sur la routes POST api/promocode on ne peut pas avoir d'erreur 500, est ce que tu peux rajouter l'erreur 500 en cas de probleme interne, qui ne soit pas lié à un duplicat ?
+> 
+> est ce qu'on peut pas faire un mock dans les test unitaire plutot que de rajouter une verrue dans AddProcode ?
+
+### Ce qui a été fait
+
+1. **Choix du code HTTP pour les duplicatas** : Validation que le code `409 Conflict` (actuellement implémenté) est le statut HTTP le plus approprié et standard pour une contrainte d'unicité violée, tandis que `400 Bad Request` est à réserver aux erreurs de forme/syntaxe de la requête.
+2. **Ajout de la gestion de l'erreur 500** :
+   * Mise à jour du schéma de réponse dans [src/routes/api/promocode/index.ts](file:///c:/dev/Indy/Indy_Test_Technique/src/routes/api/promocode/index.ts) pour documenter le code de statut `500`.
+   * Modification du bloc `catch` pour distinguer les erreurs de conflit (message contenant `"already exists"` $\rightarrow$ `409`) de toutes les autres erreurs imprévues/internes ($\rightarrow$ `500`).
+3. **Mise en place d'un Mock propre dans les tests** :
+   * Retrait de la condition temporaire de simulation d'erreur (`__FORCE_500__`) de la fonction de production `addPromocode` dans [src/services/promocodeService.ts](file:///c:/dev/Indy/Indy_Test_Technique/src/services/promocodeService.ts) afin de préserver la propreté du code.
+   * Utilisation de l'API de mock native de Node.js via `t.mock.method(promocodeService, 'addPromocode', ...)` dans [test/routes/promocode.test.ts](file:///c:/dev/Indy/Indy_Test_Technique/test/routes/promocode.test.ts) pour intercepter dynamiquement l'appel lors du test d'erreur 500.
+
+**Résultat :** `npm test` — 80/80 ✅ — couverture 99.35%
+
+
