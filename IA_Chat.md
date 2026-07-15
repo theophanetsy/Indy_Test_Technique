@@ -376,5 +376,125 @@ De plus, cette conversation a été archivée dans ce fichier [IA_Chat.md](file:
 * L'agent a ajouté une section **Configuration** dans le [README.md](file:///c:/dev/Indy/Indy_Test_Technique/README.md) juste avant la liste des scripts de build et de développement.
 * Cette section explique comment dupliquer le fichier `.env.example` en `.env` et le renseigner avec la variable d'environnement `OPENWEATHER_API_KEY` nécessaire au bon fonctionnement du service météo hors environnement de test.
 
+---
 
+# Session du 15/07/2026 — Mise en place de la CI GitHub Actions
 
+**Date :** 15/07/2026
+**Auteur :** @theophane-tassy + Antigravity (IA agentique)
+
+---
+
+## 1. Ajout du workflow CI pour lancer les TUs à chaque push
+
+### Prompt utilisateur
+> Comment ajouter sur GitHub le run des TUs à chaque push ?
+
+### Ce qui a été fait
+
+Création du fichier `.github/workflows/ci.yml` avec un workflow GitHub Actions qui :
+- Se déclenche sur chaque `push` et `pull_request` sur toutes les branches.
+- Installe Node.js 20 avec cache npm.
+- Installe les dépendances via `npm ci`.
+- Lance `npm test`.
+
+---
+
+## 2. Audit des fichiers inutiles dans le repo
+
+### Prompt utilisateur
+> Est-ce qu'il reste des fichiers inutiles dans mon repo ?
+
+### Analyse
+
+Les dossiers `dist/`, `coverage/` et `node_modules/` n'étaient pas trackés (`.gitignore` correct).
+
+Fichiers identifiés comme discutables :
+
+| Fichier | Statut |
+|---|---|
+| `IA_Chat.md` | Historique interne — ok à conserver |
+| `src/routes/example/index.ts` | Route d'exemple Fastify CLI — à supprimer si inutilisée |
+| `test/routes/example.test.ts` | Test de la route d'exemple — idem |
+| `src/plugins/README.md` & `src/routes/README.md` | Auto-générés — à supprimer selon préférence |
+
+---
+
+## 3. Correction de l'erreur CI — glob non interprété sur Linux
+
+### Erreur rencontrée
+```
+Could not find '/home/runner/work/Indy_Test_Technique/Indy_Test_Technique/test/**/*.ts'
+```
+
+### Cause
+La commande `npm test` contient `"test/**/*.ts"` entre guillemets. Sur Linux, les guillemets empêchent le shell d'étendre le glob, qui est donc passé littéralement à Node.
+
+### Solution retenue
+Ajout de `shopt -s globstar` dans le CI pour activer la récursivité de `**` en bash, et exécution de la commande directement sans guillemets :
+
+```yaml
+- name: Run tests
+  shell: bash
+  run: |
+    shopt -s globstar
+    npm run build:ts && tsc -p test/tsconfig.json && npx c8 node --test -r ts-node/register test/**/*.ts
+```
+
+### Tentatives intermédiaires
+- Utilisation de `find test -name "*.test.ts"` : fonctionnel mais verbeux.
+- Séparation de `npm test` en étapes distinctes + tentative de suivre la doc GitHub (`npm run build:ts` + `npm test`) : provoquait la cassure de `npm test` en local. **Revert effectué.**
+
+---
+
+## 4. Correction de `test/tsconfig.json` — erreurs TypeScript 5.9 sur le runner CI
+
+### Erreurs rencontrées
+```
+error TS5102: Option 'baseUrl' has been removed.
+error TS6059: File 'src/app.ts' is not under 'rootDir' '.../test'.
+```
+
+### Cause
+- `baseUrl` a été supprimé dans TypeScript 5.9 (installé via `npm ci` sur le runner).
+- `rootDir` était inféré comme `test/`, ce qui rejetait les fichiers `src/` inclus par `"../src/**/*.ts"`.
+
+### Fix appliqué dans `test/tsconfig.json`
+
+```diff
+ "compilerOptions": {
+-  "baseUrl": ".",
++  "rootDir": "..",
+   "noEmit": true
+ }
+```
+
+`rootDir: ".."` permet à TypeScript d'accepter les fichiers de `src/` et `test/` (les deux étant sous la racine du projet).
+
+**Résultat attendu :** CI ✅
+
+---
+
+# Session du 15/07/2026 — Refactoring or/and + couverture 100%
+
+**Date :** 15/07/2026
+**Auteur :** @theophane-tassy + Antigravity (IA agentique)
+
+---
+
+## Refactoring des restrictions `or` et `and` + TUs pour 100% de couverture
+
+### Prompt utilisateur
+> Tu peux refactoriser les restriction or et and comme pour les evaluateAgeRestriction evaluateDateRestriction et rajoute des TUs pour avoir 100% de coverage (ajd il manque un test sur les lignes 178-180). Ajoute ce chat au IA_Chat.md stp.
+
+### Ce qui a été fait
+
+#### 1. Refactoring dans [`promocodeService.ts`](file:///c:/dev/Indy/Indy_Test_Technique/src/services/promocodeService.ts)
+Les logiques logiques pour les restrictions `or` et `and` ont été extraites du corps de la fonction privée `evaluateRestriction` pour être placées dans leurs propres fonctions exportées et typées :
+- `evaluateOrRestriction`
+- `evaluateAndRestriction`
+
+#### 2. TUs ajoutés dans [`promocodeService.test.ts`](file:///c:/dev/Indy/Indy_Test_Technique/test/services/promocodeService.test.ts)
+- Ajout de tests pour couvrir `evaluateOrRestriction` (succès première branche, succès deuxième branche, échec de toutes les branches).
+- Ajout de tests pour couvrir `evaluateAndRestriction` (toutes branches ok, échec simple, échec multiple).
+- Ajout d'un test pour forcer l'évaluation d'une restriction inconnue (cas de fallback lignes 178-180 de `promocodeService.ts`), assurant 100% de couverture de code (statements/lines/functions) sur `promocodeService.ts`.
