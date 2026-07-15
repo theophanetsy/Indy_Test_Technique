@@ -19,7 +19,11 @@ jobs:
           cache: "npm"
 
       - run: npm ci
-      - run: npm run build:ts
-      - run: npm test
+
+      - name: Run tests
+        shell: bash
+        run: |
+          shopt -s globstar
+          npm run build:ts && tsc -p test/tsconfig.json && npx c8 node --test -r ts-node/register test/**/*.ts
         env:
           NODE_ENV: test
