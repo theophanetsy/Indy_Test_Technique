@@ -67,12 +67,14 @@ const applyPromocodeRoute: FastifyPluginAsync = async (fastify): Promise<void> =
         const result = await validatePromocode(promocode, args)
 
         if (result.valid) {
+          fastify.log.info({ promocode: promocode.name, ...args}, 'Promocode applied successfully');
           return reply.code(200).send({
             promocode_name,
             status: 'accepted',
             advantage: promocode.advantage,
           })
         } else {
+          fastify.log.error({ promocode: promocode.name, reasons: result.reasons, ...args }, 'Promocode denied');
           return reply.code(200).send({
             promocode_name,
             status: 'denied',
