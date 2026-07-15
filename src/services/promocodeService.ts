@@ -131,6 +131,31 @@ export function evaluateWeatherRestriction(
   return reasons
 }
 
+export function evaluateOrRestriction(
+  restriction: OrRestriction,
+  ctx: EvaluationContext
+): string[] {
+  const { or } = restriction
+  // At least one branch must pass (return no reasons)
+  const branchResults = or.map((r) => evaluateRestriction(r, ctx))
+  if (branchResults.some((reasons) => reasons.length === 0)) {
+    return [] // at least one branch valid
+  }
+  // All branches failed — return one labeled reason per branch so the caller
+  // can distinguish "or" failures from flat "and" failures
+  return branchResults.map((reasons, i) =>
+    `or branch ${i + 1} failed: ${reasons.join('; ')}`
+  )
+}
+
+export function evaluateAndRestriction(
+  restriction: AndRestriction,
+  ctx: EvaluationContext
+): string[] {
+  // All branches must pass
+  return restriction.and.flatMap((r) => evaluateRestriction(r, ctx))
+}
+
 /**
  * Evaluate a single restriction node.
  * Returns an array of failure reasons (empty = success).
@@ -156,24 +181,12 @@ function evaluateRestriction(
 
   // --- or ---
   if ('or' in restriction) {
-    const { or } = restriction as OrRestriction
-    // At least one branch must pass (return no reasons)
-    const branchResults = or.map((r) => evaluateRestriction(r, ctx))
-    if (branchResults.some((reasons) => reasons.length === 0)) {
-      return [] // at least one branch valid
-    }
-    // All branches failed — return one labeled reason per branch so the caller
-    // can distinguish "or" failures from flat "and" failures
-    return branchResults.map((reasons, i) =>
-      `or branch ${i + 1} failed: ${reasons.join('; ')}`
-    )
+    return evaluateOrRestriction(restriction as OrRestriction, ctx)
   }
 
   // --- and ---
   if ('and' in restriction) {
-    const { and } = restriction as AndRestriction
-    // All branches must pass
-    return and.flatMap((r) => evaluateRestriction(r, ctx));
+    return evaluateAndRestriction(restriction as AndRestriction, ctx)
   }
 
   return [`Unknown restriction type: ${JSON.stringify(restriction)}`]

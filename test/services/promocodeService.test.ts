@@ -5,6 +5,8 @@ import {
   evaluateAgeRestriction,
   evaluateDateRestriction,
   evaluateWeatherRestriction,
+  evaluateOrRestriction,
+  evaluateAndRestriction,
 } from '../../src/services/promocodeService'
 
 // Ensure the API key env var is set for all tests (fetch is mocked, key value doesn't matter)
@@ -318,4 +320,81 @@ test('evaluateWeatherRestriction — passes when restriction has no "is" or "tem
     { age: 0, weather: { description: 'fog', temp: 5 } }
   )
   assert.deepStrictEqual(reasons, [])
+})
+
+// ─── evaluateOrRestriction ────────────────────────────────────────────────────
+
+test('evaluateOrRestriction — passes when the first branch matches', () => {
+  const reasons = evaluateOrRestriction(
+    { or: [{ age: { eq: 40 } }, { age: { lt: 20 } }] },
+    { age: 40 }
+  )
+  assert.deepStrictEqual(reasons, [])
+})
+
+test('evaluateOrRestriction — passes when the second branch matches', () => {
+  const reasons = evaluateOrRestriction(
+    { or: [{ age: { eq: 40 } }, { age: { lt: 20 } }] },
+    { age: 15 }
+  )
+  assert.deepStrictEqual(reasons, [])
+})
+
+test('evaluateOrRestriction — fails with one labeled reason per branch when all branches fail', () => {
+  // age 25: not eq 40, not < 20 → both branches fail
+  const reasons = evaluateOrRestriction(
+    { or: [{ age: { eq: 40 } }, { age: { lt: 20 } }] },
+    { age: 25 }
+  )
+  assert.strictEqual(reasons.length, 2)
+  assert.ok(reasons.every((r) => r.startsWith('or branch')))
+  assert.ok(reasons[0].includes('or branch 1 failed'))
+  assert.ok(reasons[1].includes('or branch 2 failed'))
+})
+
+// ─── evaluateAndRestriction ───────────────────────────────────────────────────
+
+test('evaluateAndRestriction — passes when all branches match', () => {
+  const reasons = evaluateAndRestriction(
+    { and: [{ age: { gt: 18 } }, { age: { lt: 40 } }] },
+    { age: 25 }
+  )
+  assert.deepStrictEqual(reasons, [])
+})
+
+test('evaluateAndRestriction — fails and collects reasons from every failing branch', () => {
+  // age 45: > 18 ✓ but not < 40 ✗
+  const reasons = evaluateAndRestriction(
+    { and: [{ age: { gt: 18 } }, { age: { lt: 40 } }] },
+    { age: 45 }
+  )
+  assert.strictEqual(reasons.length, 1)
+  assert.ok(reasons[0].includes('less than 40'))
+})
+
+test('evaluateAndRestriction — collects reasons from multiple failing branches', () => {
+  // age 10: not > 18 AND not < 9 (impossible constraint to show multi-fail)
+  const reasons = evaluateAndRestriction(
+    { and: [{ age: { gt: 18 } }, { age: { gt: 20 } }] },
+    { age: 10 }
+  )
+  assert.strictEqual(reasons.length, 2)
+})
+
+// ─── evaluateRestriction — unknown restriction type (fallback) ────────────────
+
+test('evaluateOrRestriction — unknown restriction type in branch returns labeled fallback message', () => {
+  // Inject an unrecognised restriction shape inside an `or` so that the
+  // private evaluateRestriction hits its final fallback return on line 178-180.
+  // We cast to `any` because TypeScript would otherwise reject the shape.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const unknown = { unknownKey: 'boom' } as any
+  const reasons = evaluateOrRestriction(
+    { or: [unknown] },
+    { age: 0 }
+  )
+  // The branch fails (unknown → 1 reason) so or returns a labeled message
+  assert.strictEqual(reasons.length, 1)
+  assert.ok(reasons[0].startsWith('or branch 1 failed'))
+  assert.ok(reasons[0].includes('Unknown restriction type'))
 })
