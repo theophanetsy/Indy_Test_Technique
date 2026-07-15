@@ -364,4 +364,17 @@ De plus, cette conversation a été archivée dans ce fichier [IA_Chat.md](file:
 
 **Résultat :** `npm test` — 80/80 ✅ — couverture 99.35%
 
+---
+
+## Ajout de la documentation du .env dans le README
+
+### Prompt utilisateur
+> Tu peux rajouter dans le README.md le .env a remplir avec l'api openweather stp avant les commandes de build
+
+### Ce qui a été fait
+
+* L'agent a ajouté une section **Configuration** dans le [README.md](file:///c:/dev/Indy/Indy_Test_Technique/README.md) juste avant la liste des scripts de build et de développement.
+* Cette section explique comment dupliquer le fichier `.env.example` en `.env` et le renseigner avec la variable d'environnement `OPENWEATHER_API_KEY` nécessaire au bon fonctionnement du service météo hors environnement de test.
+
+
 
